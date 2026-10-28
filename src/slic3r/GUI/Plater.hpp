@@ -238,6 +238,10 @@ public:
     void get_small_btn_sync_pos_size(wxPoint &pt, wxSize &size);
     // Orca
     static bool should_show_SEMM_buttons();
+    // Orca: true when filaments can be deleted or merged. Always for SEMM/BBL with more than one filament;
+    // for multi-extruder / toolchanger / IDEX printers only while there are more filaments than extruders
+    // (e.g. after importing a model or project with more colors than the printer has tools).
+    bool can_remove_filaments() const;
     void show_SEMM_buttons();
     void enable_purge_mode_btn(bool enable);
     // Sidebar nozzle-count badge on the extruder cards (multi-nozzle printers only).

@@ -3740,8 +3740,8 @@ void Sidebar::init_filament_combo(PlaterPresetComboBox **combo, const int filame
     edit_btn->Bind(wxEVT_BUTTON, [this, edit_btn, combobox, filament_idx](wxCommandEvent) {
         bool single_or_bbl     = should_show_SEMM_buttons();
         bool is_multi_material = p->combos_filament.size() > 1;
-        if(single_or_bbl && is_multi_material) {
-           // MULTI MATERIAL Show menu
+        if((single_or_bbl && is_multi_material) || can_remove_filaments()) {
+           // MULTI MATERIAL, or FIXED MATERIAL with more filaments than extruders: Show menu
             auto menu = p->plater->filament_action_menu(filament_idx);
             wxPoint pt { 0, edit_btn->GetSize().GetHeight() + FromDIP(2) };
             pt = edit_btn->ClientToScreen(pt);
@@ -5856,6 +5856,10 @@ void Sidebar::delete_filament(size_t filament_id, int replace_filament_id) {
 
     bool is_mixed = (filament_id >= p->combos_filament.size());
 
+    // Orca: fixed-material printers keep at least one physical filament per extruder
+    if (!is_mixed && !can_remove_filaments())
+        return;
+
     if (!is_mixed) {
         if (wxGetApp().preset_bundle->is_the_only_edited_filament(filament_id) || (filament_id == 0)) {
             wxGetApp().get_tab(Preset::TYPE_FILAMENT)->select_preset(wxGetApp().preset_bundle->filament_presets[0], false, "", true);
@@ -6570,6 +6574,17 @@ bool Sidebar::should_show_SEMM_buttons()
     return cfg.opt_bool("single_extruder_multi_material") || is_bbl_vendor;
 }
 
+bool Sidebar::can_remove_filaments() const
+{
+    const size_t filament_count = p->combos_filament.size();
+    if (filament_count <= 1)
+        return false;
+    if (should_show_SEMM_buttons())
+        return true;
+    // Fixed-material printers have one filament per extruder; only filaments beyond that can be removed.
+    return filament_count > size_t(std::max(wxGetApp().preset_bundle->get_printer_extruder_count(), 1));
+}
+
 void Sidebar::show_SEMM_buttons()
 {
     // ORCA
@@ -6581,12 +6596,13 @@ void Sidebar::show_SEMM_buttons()
     bool is_single = single_or_bbl && !is_multi_material; // SINGLE EXTRUDER / BBL WITH 1 MATERIAL
     bool is_multi  = single_or_bbl && is_multi_material;  // MULTI MATERIAL WITH SINGLE EXTRUDER
     bool is_fixed  = !is_single && !is_multi;             // MULTI EXTRUDER / TOOLCHANGER / IDEX WITH FIXED MATERIAL
+    bool has_extra = is_fixed && can_remove_filaments();  // FIXED MATERIAL WITH MORE FILAMENTS THAN EXTRUDERS (e.g. imported colors)
 
     p->m_bpButton_add_filament->Show(single_or_bbl);
-    p->m_bpButton_del_filament->Show(is_multi);
+    p->m_bpButton_del_filament->Show(is_multi || has_extra);
     p->m_flushing_volume_btn->Show(  is_multi);
 
-    if (is_multi) {
+    if (is_multi || has_extra) {
         for (auto &c : p->combos_filament)
             c->edit_btn->SetBitmap_("menu_filament");
     }
