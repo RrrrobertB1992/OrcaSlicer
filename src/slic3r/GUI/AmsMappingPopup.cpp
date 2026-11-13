@@ -220,12 +220,46 @@ void MaterialItem::on_normal()
 }
 
 
-// No single text color reads well on several background colors, so text on a multi-color
-// swatch is drawn on a light, slightly transparent label.
-static void draw_text_pill(wxDC &dc, const wxPoint &text_pos, const wxSize &text_size, const wxWindow *win)
+// Text on a multi-color swatch: when its colors are all dark or all light the usual white or dark
+// text reads fine. When they are mixed no single text color does, so the text goes on a slightly
+// transparent label whose colors follow the same rule, using the average brightness.
+struct SwatchTextStyle
+{
+    wxColour text;
+    bool     pill{false};
+    wxColour pill_colour;
+};
+
+static SwatchTextStyle swatch_text_style(const std::vector<wxColour> &cols)
+{
+    const wxColour dark_text(0x26, 0x2E, 0x30);
+    size_t         dark_count = 0;
+    double         luminance_sum = 0.0;
+    for (const wxColour &col : cols) {
+        const double luminance = col.GetLuminance();
+        luminance_sum += luminance;
+        if (luminance < 0.6) ++dark_count;
+    }
+    SwatchTextStyle style;
+    if (dark_count == cols.size() || dark_count == 0) {
+        style.text = dark_count == 0 ? dark_text : *wxWHITE;
+        return style;
+    }
+    style.pill = true;
+    if (luminance_sum / cols.size() < 0.6) {
+        style.text        = *wxWHITE;
+        style.pill_colour = wxColour(dark_text.Red(), dark_text.Green(), dark_text.Blue(), 170);
+    } else {
+        style.text        = dark_text;
+        style.pill_colour = wxColour(0xF5, 0xF5, 0xF5, 170);
+    }
+    return style;
+}
+
+static void draw_text_pill(wxDC &dc, const wxPoint &text_pos, const wxSize &text_size, const wxColour &colour, const wxWindow *win)
 {
     dc.SetPen(*wxTRANSPARENT_PEN);
-    dc.SetBrush(wxBrush(wxColour(0xF5, 0xF5, 0xF5, 170)));
+    dc.SetBrush(wxBrush(colour));
     dc.DrawRoundedRectangle(text_pos.x - win->FromDIP(2), text_pos.y + win->FromDIP(1), text_size.x + win->FromDIP(4), text_size.y - win->FromDIP(2), win->FromDIP(3));
 }
 
@@ -695,8 +729,9 @@ void MaterialSyncItem::render(wxDC &dc)
     auto material_txt_size = dc.GetTextExtent(full_text);
     const wxPoint material_txt_pos((GetSize().x - material_txt_size.x) / 2, ((float) GetSize().y * 2 / 5 - material_txt_size.y) / 2);
     if (m_material_cols.size() > 1 && IsEnabled()) {
-        draw_text_pill(dc, material_txt_pos, material_txt_size, this);
-        dc.SetTextForeground(wxColour(0x26, 0x2E, 0x30));
+        const SwatchTextStyle style = swatch_text_style(m_material_cols);
+        if (style.pill) { draw_text_pill(dc, material_txt_pos, material_txt_size, style.pill_colour, this); }
+        dc.SetTextForeground(style.text);
     }
     dc.DrawText(full_text, material_txt_pos);
     int real_left_offset = get_real_offset();
@@ -1492,13 +1527,17 @@ void MappingItem::render(wxDC &dc)
         txt_colour = wxColour(0xCE, 0xCE, 0xCE);
 
     const bool multi_color = m_tray_data.material_cols.size() > 1 && !m_unmatch && IsEnabled();
-    if (multi_color) { txt_colour = wxColour(0x26, 0x2E, 0x30); }
+    SwatchTextStyle style;
+    if (multi_color) {
+        style      = swatch_text_style(m_tray_data.material_cols);
+        txt_colour = style.text;
+    }
 
     dc.SetTextForeground(txt_colour);
     //show a1
     auto txt_size = dc.GetTextExtent(m_tray_index);
     top += FromDIP(2);
-    if (multi_color) { draw_text_pill(dc, wxPoint((GetSize().x - txt_size.x) / 2, top), txt_size, this); }
+    if (multi_color && style.pill) { draw_text_pill(dc, wxPoint((GetSize().x - txt_size.x) / 2, top), txt_size, style.pill_colour, this); }
     dc.DrawText(m_tray_index, wxPoint((GetSize().x - txt_size.x) / 2, top));
 
     //show materials name
@@ -1508,7 +1547,7 @@ void MappingItem::render(wxDC &dc)
         m_name = m_name.substr(0,5) + "...";
     }
     txt_size = dc.GetTextExtent(m_name);
-    if (multi_color) { draw_text_pill(dc, wxPoint((GetSize().x - txt_size.x) / 2, top), txt_size, this); }
+    if (multi_color && style.pill) { draw_text_pill(dc, wxPoint((GetSize().x - txt_size.x) / 2, top), txt_size, style.pill_colour, this); }
     dc.DrawText(m_name, wxPoint((GetSize().x - txt_size.x) / 2, top));
 }
 
