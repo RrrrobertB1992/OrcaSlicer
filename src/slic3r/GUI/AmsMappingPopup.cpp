@@ -248,10 +248,10 @@ static SwatchTextStyle swatch_text_style(const std::vector<wxColour> &cols)
     style.pill = true;
     if (luminance_sum / cols.size() < 0.6) {
         style.text        = *wxWHITE;
-        style.pill_colour = wxColour(dark_text.Red(), dark_text.Green(), dark_text.Blue(), 170);
+        style.pill_colour = wxColour(dark_text.Red(), dark_text.Green(), dark_text.Blue(), 215);
     } else {
         style.text        = dark_text;
-        style.pill_colour = wxColour(0xF5, 0xF5, 0xF5, 170);
+        style.pill_colour = wxColour(0xF5, 0xF5, 0xF5, 215);
     }
     return style;
 }
