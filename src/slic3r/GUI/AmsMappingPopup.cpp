@@ -316,25 +316,8 @@ static int s_get_mapped_nozzle_str_line_count(const wxString& text)
     return std::max(1, static_cast<int>(wxSplit(s_wrap_mapped_nozzle_str(text), '\n', '\0').size()));
 }
 
-void MaterialItem::doRender(wxDC& dc)
+void MaterialItem::draw_material_top(wxDC& dc, const wxSize& size, const wxColour& mcolor)
 {
-    wxSize size = GetSize();
-    auto mcolor = m_material_coloul;
-    auto acolor = m_ams_coloul;
-    change_the_opacity(acolor);
-
-    if (mcolor.Alpha() == 0)
-    {
-        dc.DrawBitmap(m_transparent_mitem.bmp(), FromDIP(1), FromDIP(1));
-    }
-
-    if (!IsEnabled())
-    {
-        mcolor = wxColour(0x90, 0x90, 0x90);
-        acolor = wxColour(0x90, 0x90, 0x90);
-    }
-
-    //top
     dc.SetPen(*wxTRANSPARENT_PEN);
     if (m_material_cols.size() > 1 && IsEnabled()) {
         int top_h = FromDIP(20);
@@ -407,6 +390,28 @@ void MaterialItem::doRender(wxDC& dc)
         dc.SetBrush(wxBrush(mcolor));
         dc.DrawRectangle(0, FromDIP(10), size.x, FromDIP(10));
     }
+}
+
+void MaterialItem::doRender(wxDC& dc)
+{
+    wxSize size = GetSize();
+    auto mcolor = m_material_coloul;
+    auto acolor = m_ams_coloul;
+    change_the_opacity(acolor);
+
+    if (mcolor.Alpha() == 0)
+    {
+        dc.DrawBitmap(m_transparent_mitem.bmp(), FromDIP(1), FromDIP(1));
+    }
+
+    if (!IsEnabled())
+    {
+        mcolor = wxColour(0x90, 0x90, 0x90);
+        acolor = wxColour(0x90, 0x90, 0x90);
+    }
+
+    //top
+    draw_material_top(dc, size, mcolor);
 
     // materials name
     auto up = 0;
@@ -715,14 +720,8 @@ void MaterialSyncItem::doRender(wxDC &dc)
         acolor = wxColour(0x90, 0x90, 0x90);
     }
 
-    // top
-    dc.SetPen(*wxTRANSPARENT_PEN);
-    dc.SetBrush(wxBrush(mcolor));
-    dc.DrawRoundedRectangle(0, 0, size.x, FromDIP(20), 5);
-
-    dc.SetPen(*wxTRANSPARENT_PEN);
-    dc.SetBrush(wxBrush(mcolor));
-    dc.DrawRectangle(0, FromDIP(10), size.x, FromDIP(10));
+    // top (single color, or gradient / co-extruded colors of the original filament)
+    draw_material_top(dc, size, mcolor);
 
     dc.SetPen(wxColour(0xAC, 0xAC, 0xAC));
     dc.DrawLine(FromDIP(1), FromDIP(20), FromDIP(size.x), FromDIP(20));

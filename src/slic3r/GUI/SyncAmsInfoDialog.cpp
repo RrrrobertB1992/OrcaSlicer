@@ -14,6 +14,7 @@
 #include "slic3r/GUI/GUI.hpp"
 #include "libslic3r/Utils.hpp"
 #include <string>
+#include <sstream>
 #include "slic3r/GUI/BBLStatusBarPrint.hpp"
 #include <nlohmann/json.hpp>
 #include <cassert>
@@ -84,6 +85,7 @@
 #include "slic3r/GUI/Widgets/StaticBox.hpp"
 #include "slic3r/Utils/NetworkAgent.hpp"
 
+
 namespace fs = boost::filesystem;
 using json = nlohmann::json;
 
@@ -96,6 +98,34 @@ using json = nlohmann::json;
 #define SyncLabelWidth FromDIP(640)
 #define SyncAttentionTipWidth FromDIP(550)
 namespace Slic3r { namespace GUI {
+
+namespace {
+// The Sync dialog items only have room for a few color blocks.
+constexpr size_t SYNC_ITEM_MAX_COLORS = 3;
+
+void limit_colors(std::vector<wxColour> &cols)
+{
+    if (cols.size() > SYNC_ITEM_MAX_COLORS)
+        cols.resize(SYNC_ITEM_MAX_COLORS);
+}
+
+// Gradient / co-extruded colors of the original (project) filament at the given index.
+void set_original_colors(MaterialItem *item, const DynamicPrintConfig &config, unsigned int extruder, BitmapCache &bmcache)
+{
+    std::vector<wxColour> cols;
+    std::string           multi = config.opt_string("filament_multi_colour", extruder);
+    std::istringstream    stream(multi);
+    for (std::string color; stream >> color;) {
+        unsigned char rgb[4];
+        bmcache.parse_color4(color, rgb);
+        cols.emplace_back((int) rgb[0], (int) rgb[1], (int) rgb[2], (int) rgb[3]);
+    }
+    limit_colors(cols);
+    // filament_colour_type: "0" = gradient, otherwise co-extruded
+    int ctype = config.opt_string("filament_colour_type", extruder) == "0" ? 0 : 1;
+    item->set_material_cols(ctype, cols.size() > 1 ? cols : std::vector<wxColour>());
+}
+} // namespace
 wxDEFINE_EVENT(EVT_CLEAR_IPADDRESS, wxCommandEvent);
 wxDEFINE_EVENT(EVT_UPDATE_USER_MACHINE_LIST, wxCommandEvent);
 wxDEFINE_EVENT(EVT_PRINT_JOB_CANCEL, wxCommandEvent);
@@ -1270,6 +1300,7 @@ void SyncAmsInfoDialog::sync_ams_mapping_result(std::vector<FilamentInfo> &resul
                 }
                 std::vector<wxColour> cols;
                 for (auto col : f->colors) { cols.push_back(DevAmsTray::decode_color(col)); }
+                limit_colors(cols);
                 m->set_ams_info(ams_col, ams_id, f->ctype, cols,true);//sync_ams_mapping_result
                 break;
             }
@@ -2121,6 +2152,7 @@ void SyncAmsInfoDialog::on_set_finish_mapping(wxCommandEvent &evt)
             auto          m    = item->item;
             if (item->id == m_current_filament_id) {
                 auto ams_colour = wxColour(wxAtoi(selection_data_arr[0]), wxAtoi(selection_data_arr[1]), wxAtoi(selection_data_arr[2]), wxAtoi(selection_data_arr[3]));
+                limit_colors(material_cols);
                 m->set_ams_info(ams_colour, selection_data_arr[4], ctype, material_cols);//finish
             }
             iter++;
@@ -2713,6 +2745,7 @@ void SyncAmsInfoDialog::reset_and_sync_ams_list()
         auto item_index_str = std::to_string(item_index);
         item->set_material_index_str(item_index_str);
         item_index++;
+        set_original_colors(item, wxGetApp().preset_bundle->project_config, (unsigned int) extruder, bmcache);
 
         contronal_index++;
         item->Bind(wxEVT_LEFT_UP, [materials](wxMouseEvent &e) {});
@@ -2936,6 +2969,7 @@ void SyncAmsInfoDialog::generate_override_fix_ams_list()
         }
         item->set_material_index_str(std::to_string(item_index));
         item_index++;
+        set_original_colors(item, wxGetApp().preset_bundle->project_config, (unsigned int) extruder, bmcache);
         contronal_index++;
         item->allow_paint_dropdown(false);
 
@@ -2968,6 +3002,7 @@ void SyncAmsInfoDialog::generate_override_fix_ams_list()
                 for (auto col : m_ams_combo_info.ams_multi_color_filment[index]) {
                     cols.push_back(decode_ams_color(col));
                 }
+                limit_colors(cols);
                 it->second->item->set_ams_info(ams_color, ams_id, 0, cols);//generate_override_fix_ams_list
                 index++;
             }

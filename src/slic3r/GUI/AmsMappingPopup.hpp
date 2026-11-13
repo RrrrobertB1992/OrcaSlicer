@@ -136,6 +136,8 @@ public:
 
 protected:
     void messure_size();
+    // Draws the top half (original filament color); multi-color filaments are drawn as gradient or blocks.
+    void draw_material_top(wxDC& dc, const wxSize& size, const wxColour& mcolor);
 
 public:
     std::string m_filament_id;
