@@ -601,16 +601,38 @@ void MaterialItem::messure_size()
     }
 }
 
+// Layout of a sync item, in DIP: the name above, then the Original and AMS swatches, then the slot.
+#define SYNC_ITEM_SIZE wxSize(FromDIP(SYNC_ITEM_WIDTH_DIP), FromDIP(87))
+#define SYNC_ITEM_NAME_H FromDIP(18)
+#define SYNC_ITEM_ORIGINAL_Y FromDIP(19)
+#define SYNC_ITEM_AMS_Y FromDIP(45)
+#define SYNC_ITEM_SWATCH_H FromDIP(22)
+#define SYNC_ITEM_SLOT_Y FromDIP(69)
+#define SYNC_ITEM_SLOT_H FromDIP(18)
+#define SYNC_ITEM_SWATCH_INSET FromDIP(3)
+// A swatch shows at most this many colors.
+static const size_t MAX_SWATCH_COLORS = 7;
+
+// The colors to draw in a swatch: the first MAX_SWATCH_COLORS of `cols`, or just `colour`.
+static std::vector<wxColour> swatch_colours(const wxColour &colour, const std::vector<wxColour> &cols, bool enabled)
+{
+    if (!enabled) return {wxColour(0x90, 0x90, 0x90)};
+    if (cols.size() < 2) return {colour};
+    return std::vector<wxColour>(cols.begin(), cols.begin() + std::min(cols.size(), MAX_SWATCH_COLORS));
+}
+
 MaterialSyncItem::MaterialSyncItem(wxWindow *parent, wxColour mcolour, wxString mname, std::string filament_id) : MaterialItem(parent, mcolour, mname, filament_id)
 {
-
+    messure_size();
 }
 
 MaterialSyncItem::~MaterialSyncItem() {}
 
-int  MaterialSyncItem::get_real_offset() {
-    int real_left_offset = m_dropdown_allow_painted ? LEFT_OFFSET : -2;
-    return real_left_offset;
+void MaterialSyncItem::messure_size()
+{
+    SetSize(SYNC_ITEM_SIZE);
+    SetMinSize(SYNC_ITEM_SIZE);
+    SetMaxSize(SYNC_ITEM_SIZE);
 }
 
 void MaterialSyncItem::render(wxDC &dc)
@@ -634,12 +656,6 @@ void MaterialSyncItem::render(wxDC &dc)
             SetToolTip(_L("Upper half area:  Original\nLower half area:  Filament in AMS\nAnd you cannot click it to modify"));
         }
     }
-    dc.SetFont(::Label::Body_12);
-    if (dc.GetTextExtent(m_material_name).x > GetSize().x - 10) {
-        dc.SetFont(::Label::Body_10);
-    }
-    auto mapping_txt_size = dc.GetTextExtent(mapping_txt);
-    m_text_pos_y          = ((float) GetSize().y * 3 / 5 - mapping_txt_size.y) / 2 + (float) GetSize().y * 2 / 5;
 #ifdef __WXMSW__
     wxSize     size = GetSize();
     wxMemoryDC memdc;
@@ -658,167 +674,68 @@ void MaterialSyncItem::render(wxDC &dc)
     doRender(dc);
 #endif
 
-    auto mcolor = m_material_coloul;
-    auto acolor = m_ams_coloul;
-    change_the_opacity(acolor);
-    if (!IsEnabled()) {
-        mcolor = wxColour(0x90, 0x90, 0x90);
-        acolor = wxColour(0x90, 0x90, 0x90);
-    }
+    const wxColour text_colour = IsEnabled() ? StateColor::darkModeColorFor(wxColour(0x26, 0x2E, 0x30)) : wxColour(0x90, 0x90, 0x90);
+    dc.SetTextForeground(text_colour);
 
-    // materials name
+    // name, above the swatches
     dc.SetFont(::Label::Body_12);
-
-    auto material_name_colour = mcolor.GetLuminance() < 0.6 ? *wxWHITE : wxColour(0x26, 0x2E, 0x30);
-    if (mcolor.Alpha() == 0) { material_name_colour = wxColour(0x26, 0x2E, 0x30); }
-    dc.SetTextForeground(material_name_colour);
-
-    auto full_text = m_material_index + " " + m_material_name;
+    const auto full_text = m_material_index + " " + m_material_name;
     if (dc.GetTextExtent(full_text).x > GetSize().x - 10) {
         dc.SetFont(::Label::Body_10);
     }
+    auto name_size = dc.GetTextExtent(full_text);
+    dc.DrawText(full_text, wxPoint((GetSize().x - name_size.x) / 2, (SYNC_ITEM_NAME_H - name_size.y) / 2));
 
-    auto material_txt_size = dc.GetTextExtent(full_text);
-    dc.DrawText(full_text, wxPoint((GetSize().x - material_txt_size.x) / 2, ((float) GetSize().y * 2 / 5 - material_txt_size.y) / 2));
-    int real_left_offset = get_real_offset();
-    if (m_match) {
-        dc.SetTextForeground(StateColor::darkModeColorFor(wxColour(0x26, 0x2E, 0x30)));
-        dc.SetFont(::Label::Head_12);
-        dc.DrawText(mapping_txt, wxPoint(GetSize().x / 2 + (GetSize().x / 2 - mapping_txt_size.x) / 2 - FromDIP(8) - FromDIP(real_left_offset), m_text_pos_y));
+    // slot, below the swatches
+    dc.SetFont(m_match ? ::Label::Head_12 : ::Label::Body_12);
+    if (dc.GetTextExtent(mapping_txt).x > GetSize().x - 10) {
+        dc.SetFont(::Label::Body_10);
     }
-    else {
-        if (mcolor.Alpha() == 0) {//Because there is no unknown background color
-            material_name_colour = StateColor::darkModeColorFor(wxColour(0x26, 0x2E, 0x30));
-        }
-        dc.SetTextForeground(material_name_colour);
-        if (mapping_txt_size.x > GetSize().x - 10) {
-            dc.SetFont(::Label::Body_10);
-            mapping_txt_size = dc.GetTextExtent(mapping_txt);
-        }
-        dc.DrawText(mapping_txt, wxPoint(GetSize().x / 2 - mapping_txt_size.x / 2 , m_text_pos_y));
+    auto slot_size = dc.GetTextExtent(mapping_txt);
+    const bool draw_arrow = m_match && m_dropdown_allow_painted;
+    const ScalableBitmap &arrow = wxGetApp().dark_mode() ? m_arraw_bitmap_white : m_arraw_bitmap_gray;
+    const int arrow_gap   = FromDIP(3);
+    const int total_width = slot_size.x + (draw_arrow ? arrow_gap + arrow.GetBmpSize().x : 0);
+    const int slot_x      = (GetSize().x - total_width) / 2;
+    dc.DrawText(mapping_txt, wxPoint(slot_x, SYNC_ITEM_SLOT_Y + (SYNC_ITEM_SLOT_H - slot_size.y) / 2));
+    if (draw_arrow) {
+        dc.DrawBitmap(arrow.bmp(), slot_x + slot_size.x + arrow_gap, SYNC_ITEM_SLOT_Y + (SYNC_ITEM_SLOT_H - arrow.GetBmpSize().y) / 2);
     }
 }
 
 void MaterialSyncItem::doRender(wxDC &dc)
 {
-    wxSize size   = GetSize();
-    auto   mcolor = m_material_coloul;
-    auto   acolor = m_ams_coloul;
-    change_the_opacity(acolor);
+    const wxSize size  = GetSize();
+    const int    inset = SYNC_ITEM_SWATCH_INSET;
+    const bool   enabled = IsEnabled();
+    const double radius  = FromDIP(3);
 
-    if (mcolor.Alpha() == 0) {
-        dc.DrawBitmap(m_transparent_mitem.bmp(), FromDIP(0), FromDIP(0));
-    }
+    const wxRect original_rect(inset, SYNC_ITEM_ORIGINAL_Y, size.x - 2 * inset, SYNC_ITEM_SWATCH_H);
+    const wxRect ams_rect(inset, SYNC_ITEM_AMS_Y, size.x - 2 * inset, SYNC_ITEM_SWATCH_H);
 
-    if (!IsEnabled()) {
-        mcolor = wxColour(0x90, 0x90, 0x90);
-        acolor = wxColour(0x90, 0x90, 0x90);
-    }
-
-    // top
-    dc.SetPen(*wxTRANSPARENT_PEN);
-    dc.SetBrush(wxBrush(mcolor));
-    dc.DrawRoundedRectangle(0, 0, size.x, FromDIP(20), 5);
-
-    dc.SetPen(*wxTRANSPARENT_PEN);
-    dc.SetBrush(wxBrush(mcolor));
-    dc.DrawRectangle(0, FromDIP(10), size.x, FromDIP(10));
-
-    dc.SetPen(wxColour(0xAC, 0xAC, 0xAC));
-    dc.DrawLine(FromDIP(1), FromDIP(20), FromDIP(size.x), FromDIP(20));
-    // bottom rectangle in wheel bitmap, size is MATERIAL_REC_WHEEL_SIZE(22)
-    auto left  = (size.x / 2 - MATERIAL_REC_WHEEL_SIZE.x) / 2 + FromDIP(3);
-    auto up    = (size.y * 0.4 + (size.y * 0.6 - MATERIAL_REC_WHEEL_SIZE.y) / 2);
-    auto right = left + MATERIAL_REC_WHEEL_SIZE.x - FromDIP(3);
-    dc.SetPen(*wxTRANSPARENT_PEN);
-    int real_left_offset = get_real_offset();
-    // bottom
+    // Original filament of the project; also shown below when it has not been mapped to an AMS slot.
+    const auto original = swatch_colours(m_material_coloul, m_material_cols, enabled);
+    draw_rounded_filament_swatch(dc, original_rect, original, m_material_ctype == 0, radius);
     if (m_match) {
-        if (m_ams_cols.size() > 1) {
-            int gwidth = std::round(MATERIAL_REC_WHEEL_SIZE.x / (m_ams_cols.size() - 1));
-            // gradient
-            if (m_ams_ctype == 0) {
-                if (!m_dropdown_allow_painted) {
-                    left +=  FromDIP(5);
-                    right += FromDIP(5);
-                }
-                for (int i = 0; i < m_ams_cols.size() - 1; i++) {
-                    auto rect = wxRect(left, up, right - left, MATERIAL_REC_WHEEL_SIZE.y);
-                    fill_gradient_rect_east(dc, rect, m_ams_cols[i], m_ams_cols[i + 1]);
-                    left += gwidth;
-                }
-            } else {
-                if (!m_dropdown_allow_painted) {
-                    left +=  FromDIP(5);
-                }
-                int cols_size = m_ams_cols.size();
-                for (int i = 0; i < cols_size; i++) {
-                    dc.SetBrush(wxBrush(m_ams_cols[i]));
-                    float x = left + ((float) MATERIAL_REC_WHEEL_SIZE.x) * i / cols_size;
-                    if (i != cols_size - 1) {
-                        dc.DrawRoundedRectangle(x - FromDIP(real_left_offset), up, ((float) MATERIAL_REC_WHEEL_SIZE.x) / cols_size + FromDIP(3), MATERIAL_REC_WHEEL_SIZE.y, 3);
-                    } else {
-                        dc.DrawRoundedRectangle(x - FromDIP(real_left_offset), up, ((float) MATERIAL_REC_WHEEL_SIZE.x) / cols_size - FromDIP(1), MATERIAL_REC_WHEEL_SIZE.y, 3);
-                    }
-                }
-            }
-        } else {
-            dc.SetPen(*wxTRANSPARENT_PEN);
-            dc.SetBrush(wxBrush(wxColour(acolor)));
-            dc.DrawRectangle((size.x / 2 - MATERIAL_REC_WHEEL_SIZE.x) / 2 + FromDIP(3) - FromDIP(real_left_offset), up, MATERIAL_REC_WHEEL_SIZE.x - FromDIP(1),
-                             MATERIAL_REC_WHEEL_SIZE.y);
-        }
-    }
-    else {
-        dc.SetPen(*wxTRANSPARENT_PEN);
-        dc.SetBrush(wxBrush(mcolor));
-        dc.DrawRoundedRectangle(0, FromDIP(21), size.x, size.y - FromDIP(21), 5);
-
-        dc.DrawRectangle(0, FromDIP(21), size.x, FromDIP(10));
+        wxColour ams_colour = m_ams_coloul;
+        change_the_opacity(ams_colour);
+        draw_rounded_filament_swatch(dc, ams_rect, swatch_colours(ams_colour, m_ams_cols, enabled), m_ams_ctype == 0, radius);
+    } else {
+        draw_rounded_filament_swatch(dc, ams_rect, original, m_material_ctype == 0, radius);
     }
 
-    ////border
-#if __APPLE__
-    dc.SetPen(wxColour(0xAC, 0xAC, 0xAC));
+    const wxColour outline = wxGetApp().dark_mode() ? wxColour(107, 107, 107) : wxColour(0xAC, 0xAC, 0xAC);
     dc.SetBrush(*wxTRANSPARENT_BRUSH);
-    dc.DrawRoundedRectangle(1, 1, size.x - 1, size.y - 1, 5);
+    dc.SetPen(wxPen(outline, FromDIP(1)));
+    dc.DrawRoundedRectangle(original_rect, radius);
+    dc.DrawRoundedRectangle(ams_rect, radius);
 
-    if (m_selected) {
-        dc.SetPen(wxColour("#009688")); // ORCA selected item border color (Orca accent)
-        dc.SetBrush(*wxTRANSPARENT_BRUSH);
-        dc.DrawRoundedRectangle(1, 1, size.x - 1, size.y - 1, 5);
-    }
-#else
-
-    dc.SetPen(wxPen(wxGetApp().dark_mode() ? wxColour(107, 107, 107) : wxColour(0xAC, 0xAC, 0xAC), FromDIP(1)));
-    dc.SetBrush(*wxTRANSPARENT_BRUSH);
+    // card border
     dc.DrawRoundedRectangle(0, 0, size.x, size.y, 5);
-
     if (m_selected) {
         dc.SetPen(wxPen(wxColour("#009688"), FromDIP(2))); // ORCA selected item border color (Orca accent)
-        dc.SetBrush(*wxTRANSPARENT_BRUSH);
         dc.DrawRoundedRectangle(FromDIP(1), FromDIP(1), size.x - FromDIP(1), size.y - FromDIP(1), 5);
     }
-#endif
-
-    if (m_text_pos_y > 0 && m_match && m_dropdown_allow_painted) {
-        // arrow (remove arrow)
-        if ((acolor.Red() > 160 && acolor.Green() > 160 && acolor.Blue() > 160) && (acolor.Red() < 180 && acolor.Green() < 180 && acolor.Blue() < 180)) {
-            dc.DrawBitmap(m_arraw_bitmap_white.bmp(), size.x - m_arraw_bitmap_white.GetBmpSize().x - FromDIP(4) - FromDIP(real_left_offset), m_text_pos_y + FromDIP(3));
-        } else {
-            dc.DrawBitmap(m_arraw_bitmap_gray.bmp(), size.x - m_arraw_bitmap_gray.GetBmpSize().x - FromDIP(4) - FromDIP(real_left_offset), m_text_pos_y + FromDIP(3));
-        }
-    }
-    auto wheel_left = (GetSize().x / 2 - m_ams_wheel_mitem.GetBmpSize().x) / 2 + FromDIP(2);
-    auto wheel_top  = ((float) GetSize().y * 0.6 - m_ams_wheel_mitem.GetBmpSize().y) / 2 + (float) GetSize().y * 0.4;
-    if (m_match) {// different with parent
-        if (acolor.Alpha() == 0) {
-            dc.DrawBitmap(m_filament_wheel_transparent.bmp(), wheel_left - FromDIP(real_left_offset), wheel_top);
-        } else {
-            dc.DrawBitmap(m_ams_wheel_mitem.bmp(), wheel_left - FromDIP(real_left_offset), wheel_top);
-        }
-    }
-    //not draw m_ams_not_match
 }
 
 void MaterialSyncItem::set_material_index_str(std::string str) {
@@ -875,13 +792,15 @@ AmsMapingPopup::AmsMapingPopup(wxWindow *parent, bool use_in_sync_dialog) :
      m_left_first_text_panel  = new wxPanel(m_left_marea_panel);
      m_right_first_text_panel = new wxPanel(m_right_marea_panel);
      auto sizer_temp = new wxBoxSizer(wxHORIZONTAL);
+     const wxSize extra_slot_size(FromDIP(m_use_in_sync_dialog ? SYNC_ITEM_WIDTH_DIP : 48), FromDIP(60));
      /*left ext*/
      m_left_extra_slot = new MappingItem(m_left_marea_panel);
      m_left_extra_slot->m_ams_id = VIRTUAL_TRAY_DEPUTY_ID;
      m_left_extra_slot->m_slot_id = 0;
-     m_left_extra_slot->SetSize(wxSize(FromDIP(48), FromDIP(60)));
-     m_left_extra_slot->SetMinSize(wxSize(FromDIP(48), FromDIP(60)));
-     m_left_extra_slot->SetMaxSize(wxSize(FromDIP(48), FromDIP(60)));
+     m_left_extra_slot->set_sync_layout(m_use_in_sync_dialog);
+     m_left_extra_slot->SetSize(extra_slot_size);
+     m_left_extra_slot->SetMinSize(extra_slot_size);
+     m_left_extra_slot->SetMaxSize(extra_slot_size);
 
      auto left_panel = new wxPanel(m_left_marea_panel);
      left_panel->SetSize(wxSize(FromDIP(182), FromDIP(60)));
@@ -895,9 +814,10 @@ AmsMapingPopup::AmsMapingPopup(wxWindow *parent, bool use_in_sync_dialog) :
      m_right_extra_slot = new MappingItem(m_right_marea_panel);
      m_right_extra_slot->m_ams_id = VIRTUAL_TRAY_MAIN_ID;
      m_right_extra_slot->m_slot_id = 0;
-     m_right_extra_slot->SetSize(wxSize(FromDIP(48), FromDIP(60)));
-     m_right_extra_slot->SetMinSize(wxSize(FromDIP(48), FromDIP(60)));
-     m_right_extra_slot->SetMaxSize(wxSize(FromDIP(48), FromDIP(60)));
+     m_right_extra_slot->set_sync_layout(m_use_in_sync_dialog);
+     m_right_extra_slot->SetSize(extra_slot_size);
+     m_right_extra_slot->SetMinSize(extra_slot_size);
+     m_right_extra_slot->SetMaxSize(extra_slot_size);
 
      std::string amp_pt = wxGetApp().preset_bundle->printers.get_edited_preset().get_printer_type(wxGetApp().preset_bundle);
      m_single_tip_text = _L("Please select from the following filaments");
@@ -1019,7 +939,13 @@ AmsMapingPopup::AmsMapingPopup(wxWindow *parent, bool use_in_sync_dialog) :
              wxRect screen_size = wxDisplay(display_idx).GetClientArea();
              auto   parent_size = m_parent_item->GetRect();
              auto   content_size = m_sizer_main_h->GetMinSize();
-             int    popup_width  = content_size.x + FromDIP(28);
+             // Sync dialog: fit the slots snugly and wrap the title to their width
+             int    popup_width  = m_use_in_sync_dialog ? content_size.x : content_size.x + FromDIP(28);
+             if (m_use_in_sync_dialog) {
+                 m_title_text->Wrap(popup_width - FromDIP(2));
+                 m_title_text->GetParent()->SetMinSize(wxSize(-1, std::max(FromDIP(30), m_title_text->GetBestSize().y + FromDIP(8))));
+                 m_title_text->GetParent()->Layout();
+             }
              int    popup_height = content_size.y;
              wxSize popup_size(popup_width, popup_height);
 
@@ -1463,7 +1389,11 @@ void MappingItem::render(wxDC &dc)
     {
         dc.DrawBitmap(mapping_item_checked.bmp(), size.x - mapping_item_checked.GetBmpWidth() - FromDIP(4), top);
     }
-    top += 0.5 * mapping_item_checked.GetBmpHeight();
+    if (m_sync_layout) {
+        top = get_remain_area_height() + FromDIP(1) + FromDIP(16); // below the swatch
+    } else {
+        top += 0.5 * mapping_item_checked.GetBmpHeight();
+    }
 
     // materials name
     dc.SetFont(::Label::Head_12);
@@ -1478,15 +1408,25 @@ void MappingItem::render(wxDC &dc)
     if (!IsEnabled())
         txt_colour = wxColour(0xCE, 0xCE, 0xCE);
 
+    // The sync layout draws the labels on the plain background, below the swatch.
+    if (m_sync_layout && IsEnabled() && !m_unmatch && m_name != "-") {
+        txt_colour = StateColor::darkModeColorFor(wxColour(0x26, 0x2E, 0x30));
+    }
+    const int gap = m_sync_layout ? 0 : FromDIP(2);
+
     dc.SetTextForeground(txt_colour);
     //show a1
     auto txt_size = dc.GetTextExtent(m_tray_index);
-    top += FromDIP(2);
+    top += gap;
     dc.DrawText(m_tray_index, wxPoint((GetSize().x - txt_size.x) / 2, top));
 
     //show materials name
-    top += txt_size.y + FromDIP(2);
-    m_name.size() > 4 ? dc.SetFont(::Label::Body_9) : dc.SetFont(::Label::Body_12);
+    top += txt_size.y + gap;
+    if (m_sync_layout) {
+        dc.SetFont(::Label::Body_10);
+    } else {
+        m_name.size() > 4 ? dc.SetFont(::Label::Body_9) : dc.SetFont(::Label::Body_12);
+    }
     if(m_name.size() > 5){
         m_name = m_name.substr(0,5) + "...";
     }
@@ -1564,7 +1504,16 @@ void MappingItem::doRender(wxDC &dc)
 
 
     //draw a rectangle based on the material color, single color or muti color processing
-    if (m_tray_data.material_cols.size() > 1 && !m_unmatch) {
+    if (m_sync_layout) {
+        // Sync dialog: a rounded swatch with the labels below it.
+        const wxRect swatch(FromDIP(6), get_remain_area_height() + FromDIP(1), size.x - FromDIP(12), FromDIP(16));
+        std::vector<wxColour> cols{color};
+        if (!m_unmatch && m_tray_data.material_cols.size() > 1) {
+            cols.assign(m_tray_data.material_cols.begin(),
+                        m_tray_data.material_cols.begin() + std::min(m_tray_data.material_cols.size(), MAX_SWATCH_COLORS));
+        }
+        draw_rounded_filament_swatch(dc, swatch, cols, m_tray_data.ctype == 0, FromDIP(3));
+    } else if (m_tray_data.material_cols.size() > 1 && !m_unmatch) {
         int left = 0;
         int gwidth = std::round(MAPPING_ITEM_REAL_SIZE.x / (m_tray_data.material_cols.size() - 1));
         //gradient
@@ -2030,7 +1979,7 @@ bool AmsIntroducePopup::ProcessLeftDown(wxMouseEvent& event) {
 }
 
 
-MappingContainer::MappingContainer(wxWindow *parent, const wxString &ams_type, int slots_num)
+MappingContainer::MappingContainer(wxWindow *parent, const wxString &ams_type, int slots_num, int item_width)
     : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize)
 {
 #ifdef __WINDOWS__
@@ -2041,7 +1990,15 @@ MappingContainer::MappingContainer(wxWindow *parent, const wxString &ams_type, i
 
     m_ams_type  = ams_type;
     m_slots_num = slots_num;
-    if (slots_num == 1)
+    m_item_width = item_width;
+    if (item_width > 0)
+    {
+        // room for the slots as add_ams_mapping lays them out (6 DIP before each one) plus a margin
+        const wxSize size(FromDIP(6 + slots_num * (item_width + 6) + 8), FromDIP(82));
+        SetMinSize(size);
+        SetMaxSize(size);
+    }
+    else if (slots_num == 1)
     {
         ams_mapping_item_container = create_scaled_bitmap("ams_mapping_container_1", this, 82);
         SetMinSize(wxSize(FromDIP(74), FromDIP(82)));
@@ -2100,10 +2057,19 @@ void MappingContainer::render(wxDC& dc)
 
 void MappingContainer::doRender(wxDC& dc)
 {
-    dc.DrawBitmap(ams_mapping_item_container, 0, 0);
+    auto size = GetSize();
+    if (m_item_width > 0) {
+        // The frame of the bitmap, drawn at the width the slots need
+        dc.SetPen(*wxTRANSPARENT_PEN);
+        dc.SetBrush(wxBrush(wxColour("#AAAAAA")));
+        dc.DrawRoundedRectangle(0, 0, size.x, size.y, FromDIP(3));
+        dc.SetBrush(wxBrush(GetBackgroundColour()));
+        dc.DrawRoundedRectangle(FromDIP(1), FromDIP(1), size.x - FromDIP(2), size.y - FromDIP(18), FromDIP(3));
+    } else {
+        dc.DrawBitmap(ams_mapping_item_container, 0, 0);
+    }
 
     dc.SetFont(::Label::Head_11);
-    auto size   = GetSize();
     auto extent = dc.GetTextExtent(m_ams_type);
     dc.SetTextForeground(wxColour("#F1F1F1"));
     dc.DrawText(m_ams_type, FromDIP(10), size.GetHeight() - extent.GetHeight());

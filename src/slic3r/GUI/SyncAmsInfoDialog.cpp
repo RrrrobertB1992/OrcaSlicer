@@ -14,6 +14,7 @@
 #include "slic3r/GUI/GUI.hpp"
 #include "libslic3r/Utils.hpp"
 #include <string>
+#include <sstream>
 #include "slic3r/GUI/BBLStatusBarPrint.hpp"
 #include <nlohmann/json.hpp>
 #include <cassert>
@@ -100,6 +101,21 @@ wxDEFINE_EVENT(EVT_CLEAR_IPADDRESS, wxCommandEvent);
 wxDEFINE_EVENT(EVT_UPDATE_USER_MACHINE_LIST, wxCommandEvent);
 wxDEFINE_EVENT(EVT_PRINT_JOB_CANCEL, wxCommandEvent);
 #define SYNC_FLEX_GRID_COL 7
+
+// Gradient / co-extruded colors of the original (project) filament, shown in the item's Original swatch.
+static void set_original_colors(MaterialItem *item, const DynamicPrintConfig &config, unsigned int extruder, BitmapCache &bmcache)
+{
+    std::vector<wxColour> cols;
+    std::istringstream    stream(config.opt_string("filament_multi_colour", extruder));
+    for (std::string color; stream >> color;) {
+        unsigned char rgb[4];
+        bmcache.parse_color4(color, rgb);
+        cols.emplace_back((int) rgb[0], (int) rgb[1], (int) rgb[2], (int) rgb[3]);
+    }
+    // filament_colour_type: "0" = gradient, otherwise co-extruded
+    const int ctype = config.opt_string("filament_colour_type", extruder) == "0" ? 0 : 1;
+    item->set_material_cols(ctype, cols.size() > 1 ? cols : std::vector<wxColour>());
+}
 bool SyncAmsInfoDialog::Show(bool show)
 {
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " SyncAmsInfoDialog begin show";
@@ -2680,14 +2696,14 @@ void SyncAmsInfoDialog::reset_and_sync_ams_list()
                     m_original_in_colormap->SetForegroundColour(StateColor::darkModeColorFor(wxColour("#363636"))); // ORCA match label colors
                     m_original_in_colormap->SetFont(::Label::Head_12);
                 }
-                ams_tip_sizer->Add(m_original_in_colormap, 0, wxALIGN_LEFT | wxTOP, FromDIP(6));
+                ams_tip_sizer->Add(m_original_in_colormap, 0, wxALIGN_LEFT | wxTOP, FromDIP(25));
 
                 if (!m_ams_or_ext_text_in_colormap) {
                     m_ams_or_ext_text_in_colormap = new wxStaticText(m_filament_panel, wxID_ANY, _L("AMS") + ":");
                     m_ams_or_ext_text_in_colormap->SetForegroundColour(StateColor::darkModeColorFor(wxColour("#363636"))); // ORCA match label colors
                     m_ams_or_ext_text_in_colormap->SetFont(::Label::Head_12);
                 }
-                ams_tip_sizer->Add(m_ams_or_ext_text_in_colormap, 0, wxALIGN_LEFT | wxTOP, FromDIP(9));
+                ams_tip_sizer->Add(m_ams_or_ext_text_in_colormap, 0, wxALIGN_LEFT | wxTOP, FromDIP(8));
             }
             m_sizer_ams_mapping->Add(ams_tip_sizer, 0, wxALIGN_LEFT | wxTOP, FromDIP(2));
             contronal_index++;
@@ -2713,6 +2729,7 @@ void SyncAmsInfoDialog::reset_and_sync_ams_list()
         auto item_index_str = std::to_string(item_index);
         item->set_material_index_str(item_index_str);
         item_index++;
+        set_original_colors(item, wxGetApp().preset_bundle->project_config, (unsigned int) extruder, bmcache);
 
         contronal_index++;
         item->Bind(wxEVT_LEFT_UP, [materials](wxMouseEvent &e) {});
@@ -2904,7 +2921,7 @@ void SyncAmsInfoDialog::generate_override_fix_ams_list()
                     m_original_in_override->SetForegroundColour(StateColor::darkModeColorFor(wxColour("#363636"))); // ORCA match label colors
                     m_original_in_override->SetFont(::Label::Head_12);
                 }
-                ams_tip_sizer->Add(m_original_in_override, 0, wxALIGN_LEFT | wxTOP, FromDIP(6));
+                ams_tip_sizer->Add(m_original_in_override, 0, wxALIGN_LEFT | wxTOP, FromDIP(25));
 
                 if (!m_ams_or_ext_text_in_override) {
                     auto text = (m_only_exist_ext_spool_flag ? _L("Ext spool") : _L("AMS")) + ":";
@@ -2912,7 +2929,7 @@ void SyncAmsInfoDialog::generate_override_fix_ams_list()
                     m_ams_or_ext_text_in_override->SetForegroundColour(StateColor::darkModeColorFor(wxColour("#363636"))); // ORCA match label colors
                     m_ams_or_ext_text_in_override->SetFont(::Label::Head_12);
                 }
-                ams_tip_sizer->Add(m_ams_or_ext_text_in_override, 0, wxALIGN_LEFT | wxTOP, FromDIP(9));
+                ams_tip_sizer->Add(m_ams_or_ext_text_in_override, 0, wxALIGN_LEFT | wxTOP, FromDIP(8));
             }
             m_fix_sizer_ams_mapping->Add(ams_tip_sizer, 0, wxALIGN_LEFT | wxTOP, FromDIP(2));
             contronal_index++;
@@ -2936,6 +2953,7 @@ void SyncAmsInfoDialog::generate_override_fix_ams_list()
         }
         item->set_material_index_str(std::to_string(item_index));
         item_index++;
+        set_original_colors(item, wxGetApp().preset_bundle->project_config, (unsigned int) extruder, bmcache);
         contronal_index++;
         item->allow_paint_dropdown(false);
 

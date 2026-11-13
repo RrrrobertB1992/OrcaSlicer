@@ -282,7 +282,8 @@ void AmsMapingPopup::update_mapping_items(MachineObject* obj, const std::vector<
         }
 
         auto sizer_mapping_list = new wxBoxSizer(wxHORIZONTAL);
-        auto ams_mapping_item_container = new MappingContainer(target_panel, ams_iter->second->GetDisplayName(), ams_iter->second->GetSlotCount());
+        auto ams_mapping_item_container = new MappingContainer(target_panel, ams_iter->second->GetDisplayName(), ams_iter->second->GetSlotCount(),
+                                                                        m_use_in_sync_dialog ? SYNC_ITEM_WIDTH_DIP : 0);
         ams_mapping_item_container->SetName(target_panel->GetName());
         ams_mapping_item_container->SetSizer(sizer_mapping_list);
         ams_mapping_item_container->Layout();
@@ -331,7 +332,7 @@ void AmsMapingPopup::update_mapping_items(MachineObject* obj, const std::vector<
             auto sizer_mapping_list = new wxBoxSizer(wxHORIZONTAL);
             // TRN Short labels of the external spool of the right and left nozzle
             const auto& shown_name = td_opt->ams_id == VIRTUAL_TRAY_MAIN_ID ? _L("Ext-R") : _L("Ext-L");
-            auto ams_mapping_item_container = new MappingContainer(m_right_marea_panel, shown_name, 1);
+            auto ams_mapping_item_container = new MappingContainer(m_right_marea_panel, shown_name, 1, m_use_in_sync_dialog ? SYNC_ITEM_WIDTH_DIP : 0);
             ams_mapping_item_container->SetName(m_right_marea_panel->GetName());
             ams_mapping_item_container->SetSizer(sizer_mapping_list);
             ams_mapping_item_container->Layout();
@@ -426,7 +427,7 @@ void AmsMapingPopup::update_ams_data_multi_machines()
         if (ams_type >= 1 && ams_type <= 3) { // 1:ams 2:ams-lite 3:n3f
 
             auto sizer_mapping_list = new wxBoxSizer(wxHORIZONTAL);
-            auto ams_mapping_item_container = new MappingContainer(nozzle_id == 0 ? m_right_marea_panel : m_left_marea_panel, "AMS-1", 4);
+            auto ams_mapping_item_container = new MappingContainer(nozzle_id == 0 ? m_right_marea_panel : m_left_marea_panel, "AMS-1", 4, m_use_in_sync_dialog ? SYNC_ITEM_WIDTH_DIP : 0);
             ams_mapping_item_container->SetName(nozzle_id == 0 ? m_right_marea_panel->GetName() : m_left_marea_panel->GetName());
             ams_mapping_item_container->SetSizer(sizer_mapping_list);
             ams_mapping_item_container->Layout();
@@ -469,6 +470,12 @@ void AmsMapingPopup::update_ams_data_multi_machines()
 
 void AmsMapingPopup::update_title(MachineObject* obj)
 {
+    // Sync dialog: name the filament being changed, as the item that opened the popup shows it (e.g. "1 PLA")
+    if (m_use_in_sync_dialog && !m_material_index.empty()) {
+        m_title_text->SetLabelText(wxString::Format(_L("Please select the filament for %s."), wxString::FromUTF8(m_material_index + " " + m_tag_material)));
+        return;
+    }
+
     const auto& full_config = wxGetApp().preset_bundle->full_config();
     size_t nozzle_nums = full_config.option<ConfigOptionFloatsNullable>("nozzle_diameter")->values.size();
     if (nozzle_nums > 1) {
@@ -594,9 +601,12 @@ void AmsMapingPopup::add_ams_mapping(std::vector<TrayData> tray_data,
             m_mapping_item->set_tray_index(wxGetApp().transition_tridid(tray_data[i].id));
         }
 
-        m_mapping_item->SetSize(wxSize(FromDIP(48), FromDIP(60)));
-        m_mapping_item->SetMinSize(wxSize(FromDIP(48), FromDIP(60)));
-        m_mapping_item->SetMaxSize(wxSize(FromDIP(48), FromDIP(60)));
+        m_mapping_item->set_sync_layout(m_use_in_sync_dialog);
+        // Sync dialog: slots are as wide as the slot button that opened the popup
+        const wxSize tile_size(FromDIP(m_use_in_sync_dialog ? SYNC_ITEM_WIDTH_DIP : 48), FromDIP(60));
+        m_mapping_item->SetSize(tile_size);
+        m_mapping_item->SetMinSize(tile_size);
+        m_mapping_item->SetMaxSize(tile_size);
 
         // traversal if can pick the item or not
         bool can_pick_the_item = true;

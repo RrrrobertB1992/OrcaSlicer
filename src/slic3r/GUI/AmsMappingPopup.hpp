@@ -135,7 +135,7 @@ public:
     void msw_rescale();
 
 protected:
-    void messure_size();
+    virtual void messure_size();
 
 public:
     std::string m_filament_id;
@@ -183,11 +183,12 @@ public:
     // Orca: filament_id defaults to empty for existing 3-arg callers (see MaterialItem).
     MaterialSyncItem(wxWindow *parent, wxColour mcolour, wxString mname, std::string filament_id = std::string());
     ~MaterialSyncItem();
-    int  get_real_offset();
     void render(wxDC &dc) override;
     void doRender(wxDC &dc) override;
     void set_material_index_str(std::string str);
     const std::string &get_material_index_str() { return m_material_index; }
+protected:
+    void messure_size() override;
 private:
     std::string m_material_index;
 };
@@ -216,6 +217,8 @@ public:
     void set_data(const wxString& tag_name, wxColour colour, wxString name, bool remain_detect, TrayData data, bool unmatch = false, std::optional<wxString> tooltip_opt = std::nullopt);
     void set_checked(bool checked);
     void set_tray_index(wxString t_index) { m_tray_index = t_index; };
+    // Show the colors in a swatch with the labels below it, as the Sync dialog does.
+    void set_sync_layout(bool sync_layout) { m_sync_layout = sync_layout; }
 
     void msw_rescale();
 
@@ -228,19 +231,25 @@ private:
 
 private:
     bool m_checked = false;
+    bool m_sync_layout = false;
     bool m_support_remain_detect = false;/*paint the area as 100 percent*/
     bool m_to_paint_remain = false;/*do not paint the area*/
 };
+
+// Width (DIP) of a Sync dialog slot; the AMS slots in its popup match it.
+static constexpr int SYNC_ITEM_WIDTH_DIP = 65;
 
 class MappingContainer : public wxPanel
 {
 private:
     int       m_slots_num = 4;/*1 or 4*/
+    int       m_item_width = 0; // DIP width of each slot; 0 = the fixed-size frame
     wxString  m_ams_type;
     wxBitmap  ams_mapping_item_container;
 
 public:
-    MappingContainer(wxWindow* parent, const wxString& ams_type, int slots_num = 4);
+    // item_width: when > 0 the frame is drawn to fit that many slots of that width (DIP)
+    MappingContainer(wxWindow* parent, const wxString& ams_type, int slots_num = 4, int item_width = 0);
     ~MappingContainer();
 
 public:
