@@ -220,6 +220,15 @@ void MaterialItem::on_normal()
 }
 
 
+// No single text color reads well on several background colors, so text on a multi-color
+// swatch is drawn on a light, slightly transparent label.
+static void draw_text_pill(wxDC &dc, const wxPoint &text_pos, const wxSize &text_size, const wxWindow *win)
+{
+    dc.SetPen(*wxTRANSPARENT_PEN);
+    dc.SetBrush(wxBrush(wxColour(0xF5, 0xF5, 0xF5, 170)));
+    dc.DrawRoundedRectangle(text_pos.x - win->FromDIP(2), text_pos.y + win->FromDIP(1), text_size.x + win->FromDIP(4), text_size.y - win->FromDIP(2), win->FromDIP(3));
+}
+
 void MaterialItem::paintEvent(wxPaintEvent &evt)
 {
     wxPaintDC dc(this);
@@ -686,11 +695,7 @@ void MaterialSyncItem::render(wxDC &dc)
     auto material_txt_size = dc.GetTextExtent(full_text);
     const wxPoint material_txt_pos((GetSize().x - material_txt_size.x) / 2, ((float) GetSize().y * 2 / 5 - material_txt_size.y) / 2);
     if (m_material_cols.size() > 1 && IsEnabled()) {
-        // No single text color reads well on several background colors, so put the text on a light label.
-        const int pad_x = FromDIP(4);
-        dc.SetPen(*wxTRANSPARENT_PEN);
-        dc.SetBrush(wxBrush(wxColour(0xF5, 0xF5, 0xF5)));
-        dc.DrawRoundedRectangle(material_txt_pos.x - pad_x, material_txt_pos.y, material_txt_size.x + 2 * pad_x, material_txt_size.y, FromDIP(3));
+        draw_text_pill(dc, material_txt_pos, material_txt_size, this);
         dc.SetTextForeground(wxColour(0x26, 0x2E, 0x30));
     }
     dc.DrawText(full_text, material_txt_pos);
@@ -1486,10 +1491,14 @@ void MappingItem::render(wxDC &dc)
     if (!IsEnabled())
         txt_colour = wxColour(0xCE, 0xCE, 0xCE);
 
+    const bool multi_color = m_tray_data.material_cols.size() > 1 && !m_unmatch && IsEnabled();
+    if (multi_color) { txt_colour = wxColour(0x26, 0x2E, 0x30); }
+
     dc.SetTextForeground(txt_colour);
     //show a1
     auto txt_size = dc.GetTextExtent(m_tray_index);
     top += FromDIP(2);
+    if (multi_color) { draw_text_pill(dc, wxPoint((GetSize().x - txt_size.x) / 2, top), txt_size, this); }
     dc.DrawText(m_tray_index, wxPoint((GetSize().x - txt_size.x) / 2, top));
 
     //show materials name
@@ -1499,6 +1508,7 @@ void MappingItem::render(wxDC &dc)
         m_name = m_name.substr(0,5) + "...";
     }
     txt_size = dc.GetTextExtent(m_name);
+    if (multi_color) { draw_text_pill(dc, wxPoint((GetSize().x - txt_size.x) / 2, top), txt_size, this); }
     dc.DrawText(m_name, wxPoint((GetSize().x - txt_size.x) / 2, top));
 }
 
