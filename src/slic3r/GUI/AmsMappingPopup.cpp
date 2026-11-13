@@ -686,11 +686,11 @@ void MaterialSyncItem::render(wxDC &dc)
     auto material_txt_size = dc.GetTextExtent(full_text);
     const wxPoint material_txt_pos((GetSize().x - material_txt_size.x) / 2, ((float) GetSize().y * 2 / 5 - material_txt_size.y) / 2);
     if (m_material_cols.size() > 1 && IsEnabled()) {
-        // No single text color reads well on several background colors, so outline the text.
-        dc.SetTextForeground(*wxWHITE);
-        const int d = FromDIP(1);
-        for (const wxPoint &offset : {wxPoint(-d, 0), wxPoint(d, 0), wxPoint(0, -d), wxPoint(0, d)})
-            dc.DrawText(full_text, material_txt_pos + offset);
+        // No single text color reads well on several background colors, so put the text on a light label.
+        const int pad_x = FromDIP(4);
+        dc.SetPen(*wxTRANSPARENT_PEN);
+        dc.SetBrush(wxBrush(wxColour(0xF5, 0xF5, 0xF5)));
+        dc.DrawRoundedRectangle(material_txt_pos.x - pad_x, material_txt_pos.y, material_txt_size.x + 2 * pad_x, material_txt_size.y, FromDIP(3));
         dc.SetTextForeground(wxColour(0x26, 0x2E, 0x30));
     }
     dc.DrawText(full_text, material_txt_pos);
