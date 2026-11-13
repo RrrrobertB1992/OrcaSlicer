@@ -684,7 +684,16 @@ void MaterialSyncItem::render(wxDC &dc)
     }
 
     auto material_txt_size = dc.GetTextExtent(full_text);
-    dc.DrawText(full_text, wxPoint((GetSize().x - material_txt_size.x) / 2, ((float) GetSize().y * 2 / 5 - material_txt_size.y) / 2));
+    const wxPoint material_txt_pos((GetSize().x - material_txt_size.x) / 2, ((float) GetSize().y * 2 / 5 - material_txt_size.y) / 2);
+    if (m_material_cols.size() > 1 && IsEnabled()) {
+        // No single text color reads well on several background colors, so outline the text.
+        dc.SetTextForeground(*wxWHITE);
+        const int d = FromDIP(1);
+        for (const wxPoint &offset : {wxPoint(-d, 0), wxPoint(d, 0), wxPoint(0, -d), wxPoint(0, d)})
+            dc.DrawText(full_text, material_txt_pos + offset);
+        dc.SetTextForeground(wxColour(0x26, 0x2E, 0x30));
+    }
+    dc.DrawText(full_text, material_txt_pos);
     int real_left_offset = get_real_offset();
     if (m_match) {
         dc.SetTextForeground(StateColor::darkModeColorFor(wxColour(0x26, 0x2E, 0x30)));
