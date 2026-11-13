@@ -721,6 +721,15 @@ SyncAmsInfoDialog::SyncAmsInfoDialog(wxWindow *parent, SyncInfo &info) :
 
     // bind
     Bind(wxEVT_CLOSE_WINDOW, &SyncAmsInfoDialog::on_cancel, this);
+#ifdef __WXGTK__
+    // A popup only follows the deactivation of its top-level parent, which for this dialog is the main window
+    // (already inactive while the dialog is modal), so close the slot popup when this dialog loses focus.
+    Bind(wxEVT_ACTIVATE, [this](wxActivateEvent &e) {
+        e.Skip();
+        if (!e.GetActive() && m_mapping_popup.IsShown())
+            m_mapping_popup.Dismiss();
+    });
+#endif
 
     for (int i = 0; i < BED_TYPE_COUNT; i++) { m_bedtype_list.push_back(SelectMachineDialog::MACHINE_BED_TYPE_STRING[i]); }
 
