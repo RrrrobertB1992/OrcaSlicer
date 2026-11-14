@@ -370,6 +370,8 @@ nlohmann::json color_picker_ui_strings()
         // TRN: Co-extruded filament has two or more solid colors side by side along its length (e.g. dual color silk).
         {"Add co-extruded color", _u8L("Add co-extruded color")},
         {"Co-extruded color", _u8L("Co-extruded color")},
+        // TRN: Label of the Solid side of the color picker's mode switch while the Solid mode holds two or more colors side by side.
+        {"Co-extruded", _u8L("Co-extruded")},
         {"Add color", _u8L("Add color")},
         {"Remove color", _u8L("Remove color")},
         {"Saturation", _u8L("Saturation")},

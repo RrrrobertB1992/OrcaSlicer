@@ -23,7 +23,7 @@
   const byId = (id) => document.getElementById(id);
   const canvas = byId("spectrum"), context = canvas.getContext("2d");
   const paletteCombo = byId("paletteCombo"), palette = byId("palette"), preview = byId("colorPreview"), confirmBtn = byId("confirmBtn");
-  const modeSwitch = byId("modeSwitch"), satSlider = byId("satSlider"), opacitySlider = byId("opacitySlider");
+  const modeSwitch = byId("modeSwitch"), solidLabel = byId("solidLabel"), satSlider = byId("satSlider"), opacitySlider = byId("opacitySlider");
   const gradientBar = byId("gradientCtrlBar"), gradientStops = byId("gradientStops"), gradientAdd = byId("gradientAdd"), gradientRemove = byId("gradientRemove");
   const hostGradientLimit = (options) => options.max_gradient_colors === undefined ? 2 : options.max_gradient_colors;
   const originalPreview = byId("originalPreview"), palettePanel = byId("palettePanel"), paletteToggle = byId("paletteToggle");
@@ -108,6 +108,8 @@
     satSlider.style.setProperty("--thumb-color", `hsl(${hsl[0]},${hsl[1]}%,${hsl[2]}%)`);
     modeSwitch.checked = state.mode === "gradient";
     const selection = model.exportSelection(state);
+    // Two or more Solid color blocks are a co-extruded color, so the Solid side of the switch says so.
+    solidLabel.textContent = T(state.mode === "solid" && selection.colors.length > 1 ? "Co-extruded" : "Solid");
     // Kept in the layout (visibility only) so the grid doesn't shift between Solid and Gradient. Solid
     // shows its color blocks only where multi-color selections are allowed.
     const showBar = state.options.allow_gradient;

@@ -353,7 +353,9 @@ test("Solid adds co-extruded color blocks only where the caller allows multi-col
     assert.equal(await page.locator("#gradientCtrlBar").isVisible(), coextruded, "Solid shows its color bar only with co-extruded colors");
     if (!coextruded) continue;
     assert.equal(await page.locator("#gradientRemove").isVisible(), false, "a single solid color has nothing to remove");
+    assert.equal(await page.locator("#solidLabel").textContent(), "Solid");
     await page.locator("#gradientAdd").click();
+    assert.equal(await page.locator("#solidLabel").textContent(), "Co-extruded", "two or more blocks are a co-extruded color");
     await page.locator("#gradientAdd").click();
     const thumbs = await page.locator(".gradient-thumb").evaluateAll(elements => elements.map(element => {
       const rect = element.getBoundingClientRect(), track = element.parentElement.getBoundingClientRect();
