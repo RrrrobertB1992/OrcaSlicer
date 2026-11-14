@@ -373,6 +373,7 @@ test("Solid adds co-extruded color blocks only where the caller allows multi-col
     assert.equal(selection.colors[0], "#11223367");
     await page.locator("label[for=modeSwitch]").click();
     assert.deepEqual(await page.evaluate(() => ColorPickerDialog.exportSelection()), {...selection, type: "gradient"});
+    assert.equal(await page.locator("#solidLabel").textContent(), "Co-extruded", "the label stays while Gradient is shown");
     await page.locator("label[for=modeSwitch]").click();
     assert.deepEqual(await page.evaluate(() => ColorPickerDialog.exportSelection()), selection, "the colors carry over and back");
     await page.locator("#confirmBtn").click();

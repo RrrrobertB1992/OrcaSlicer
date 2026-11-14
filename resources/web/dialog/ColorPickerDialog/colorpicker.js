@@ -108,8 +108,9 @@
     satSlider.style.setProperty("--thumb-color", `hsl(${hsl[0]},${hsl[1]}%,${hsl[2]}%)`);
     modeSwitch.checked = state.mode === "gradient";
     const selection = model.exportSelection(state);
-    // Two or more Solid color blocks are a co-extruded color, so the Solid side of the switch says so.
-    solidLabel.textContent = T(state.mode === "solid" && selection.colors.length > 1 ? "Co-extruded" : "Solid");
+    // Two or more Solid color blocks are a co-extruded color, so the Solid side of the switch says so,
+    // also while Gradient is shown.
+    solidLabel.textContent = T(state.solid?.length > 1 ? "Co-extruded" : "Solid");
     // Kept in the layout (visibility only) so the grid doesn't shift between Solid and Gradient. Solid
     // shows its color blocks only where multi-color selections are allowed.
     const showBar = state.options.allow_gradient;
