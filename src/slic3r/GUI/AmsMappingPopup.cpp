@@ -941,20 +941,14 @@ AmsMapingPopup::AmsMapingPopup(wxWindow *parent, bool use_in_sync_dialog) :
 
              wxRect screen_size = wxDisplay(display_idx).GetClientArea();
              auto   parent_size = m_parent_item->GetRect();
-<<<<<<< HEAD
-             auto   content_size = m_sizer_main_h->GetMinSize();
-             // Sync dialog: fit the slots snugly and wrap the title to their width
-             int    popup_width  = m_use_in_sync_dialog ? content_size.x : content_size.x + FromDIP(28);
-             if (m_use_in_sync_dialog) {
-                 m_title_text->Wrap(popup_width - FromDIP(2));
-                 m_title_text->GetParent()->SetMinSize(wxSize(-1, std::max(FromDIP(30), m_title_text->GetBestSize().y + FromDIP(8))));
-                 m_title_text->GetParent()->Layout();
-             }
-             int    popup_height = content_size.y;
-             wxSize popup_size(popup_width, popup_height);
-=======
               auto   content_size = m_sizer_main_h->GetMinSize();
-              int    popup_width  = content_size.x + FromDIP(28);
+              // Sync dialog: fit the slots snugly and wrap the title to their width
+              int    popup_width  = m_use_in_sync_dialog ? content_size.x : content_size.x + FromDIP(28);
+              if (m_use_in_sync_dialog) {
+                  m_title_text->Wrap(popup_width - FromDIP(2));
+                  m_title_text->GetParent()->SetMinSize(wxSize(-1, std::max(FromDIP(30), m_title_text->GetBestSize().y + FromDIP(8))));
+                  m_title_text->GetParent()->Layout();
+              }
               int    popup_height = content_size.y;
               const int frame_padding = FromDIP(28);
               const bool horizontal_scroll = popup_width + frame_padding > screen_size.GetWidth();
@@ -963,7 +957,6 @@ AmsMapingPopup::AmsMapingPopup(wxWindow *parent, bool use_in_sync_dialog) :
                   : popup_width;
               const int popup_total_width = viewport_width + frame_padding;
               wxSize popup_size(popup_total_width, popup_height);
->>>>>>> upstream/main
 
               // Keep placement independent from content overflow. A tile anchor outside the
               // display bounds must not make the scroll viewport as wide as the display.
